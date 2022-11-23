@@ -1,6 +1,7 @@
 package models
 
 type CmdRequest struct {
-	Command   string   `json:"command" validate:"required,alpha,min=1,max=128"`
-	Arguments []string `json:"arguments" validate:"dive,required,min=1,max=128"`
+	ShellName string `json:"shell_name" validate:"max=128"`
+	Password  string `json:"password" validate:"max=256"`
+	Command   string `json:"command" validate:"required,min=1,max=256"`
 }

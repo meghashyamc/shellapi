@@ -34,13 +34,13 @@ func getValidationErrors(err error) []string {
 
 func getMessageForValidationTag(fieldError validator.FieldError) string {
 	switch fieldError.Tag() {
-	case "required":
+	case validateRequired:
 		return "this field is required"
-	case "min":
+	case validateMin:
 		return fmt.Sprintf("the field does not meet the minimum length/value requirement: %s", fieldError.Param())
-	case "max":
+	case validateMax:
 		return fmt.Sprintf("the field does not meet the maximum length/value requirement: %s", fieldError.Param())
-	case "alpha":
+	case validateAlphabet:
 		return fmt.Sprintf("only alphabets are allowed for this field, so %s is not valid", fieldError.Value())
 	}
 

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -31,7 +32,7 @@ func NewHTTPListener() (*HTTPListener, error) {
 	listener := &HTTPListener{validate: newValidator()}
 	server := &http.Server{
 		Handler:      addCORSOptions(listener.newRouter()),
-		Addr:         ":" + os.Getenv("PORT"),
+		Addr:         fmt.Sprintf(":%d", servicePort),
 		WriteTimeout: 60 * time.Second,
 		ReadTimeout:  60 * time.Second,
 	}
@@ -41,17 +42,18 @@ func NewHTTPListener() (*HTTPListener, error) {
 }
 
 func (l *HTTPListener) Listen() {
+	lg := logger("none", context.Background())
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		if err := l.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.WithFields(log.Fields{"err": err.Error()}).Error("HTTP listener exited with an error")
+			lg.WithFields(log.Fields{"err": err.Error()}).Error("HTTP listener exited with an error")
 		}
 	}()
 
-	log.WithFields(log.Fields{"address": l.server.Addr}).Info("server started, listening successfully")
+	lg.WithFields(log.Fields{"address": l.server.Addr}).Info("server started, listening successfully")
 	signalReceived := <-done
-	log.WithFields(log.Fields{"signal": signalReceived.String()}).Info("server stopped because of signal")
+	lg.WithFields(log.Fields{"signal": signalReceived.String()}).Info("server stopped because of signal")
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTime)
 	defer func() {
@@ -59,10 +61,10 @@ func (l *HTTPListener) Listen() {
 	}()
 
 	if err := l.server.Shutdown(ctx); err != nil {
-		log.WithFields(log.Fields{"err": err.Error()}).Error("server shutdown failed")
+		lg.WithFields(log.Fields{"err": err.Error()}).Error("server shutdown failed")
 		return
 	}
-	log.Info("server exited gracefully")
+	lg.Info("server exited gracefully")
 
 }
 

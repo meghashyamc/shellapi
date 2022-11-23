@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/meghashyamc/shellapi/models"
 	"github.com/meghashyamc/shellapi/shell"
 
@@ -11,6 +12,8 @@ import (
 )
 
 func (l *HTTPListener) homeHandler(w http.ResponseWriter, r *http.Request) {
+	lg := logger(mux.CurrentRoute(r).GetName(), r.Context())
+	lg.Info()
 
 	writeResponse(w, http.StatusOK, true, "Successfully reached API home", nil, nil)
 
@@ -19,10 +22,11 @@ func (l *HTTPListener) homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func (l *HTTPListener) cmdHandler(w http.ResponseWriter, r *http.Request) {
 
-	log.Info("api/cmd request received")
+	lg := logger(mux.CurrentRoute(r).GetName(), r.Context())
+	lg.Info()
 	cmdRequest := models.CmdRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&cmdRequest); err != nil {
-		log.WithFields(log.Fields{"err": err.Error()}).Error(errCouldNotUnmarshal)
+		lg.WithFields(log.Fields{"err": err.Error()}).Error(errCouldNotUnmarshal)
 		writeResponse(w, http.StatusBadRequest, false, "", []string{errCouldNotUnmarshal}, nil)
 		return
 	}
@@ -30,16 +34,16 @@ func (l *HTTPListener) cmdHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if err := l.validate.Struct(cmdRequest); err != nil {
-		log.WithFields(log.Fields{"err": err.Error()}).Info(errRequestValidationFailed)
+		lg.WithFields(log.Fields{"err": err.Error()}).Info(errRequestValidationFailed)
 		writeResponse(w, http.StatusBadRequest, false, errRequestValidationFailed, getValidationErrors(err), nil)
 		return
 	}
 
-	result := shell.ExecuteCmd(cmdRequest.Command, cmdRequest.Arguments)
+	result := shell.ExecuteCmd(r.Context(), cmdRequest.ShellName, cmdRequest.Password, cmdRequest.Command, lg)
 	if result.Error != nil {
-		writeResponse(w, result.StatusCode, false, "command execution failed", []string{result.Error.Error()}, cmdResponse{StdOut: result.StdOut, StdErr: result.StdErr})
+		writeResponse(w, result.StatusCode, false, result.Message, []string{result.Error.Error()}, cmdResponse{StdOut: result.StdOut, StdErr: result.StdErr})
 		return
 	}
-	writeResponse(w, http.StatusOK, true, "command executed successfully", []string{}, cmdResponse{StdOut: result.StdOut, StdErr: result.StdErr})
+	writeResponse(w, http.StatusOK, true, result.Message, []string{}, cmdResponse{StdOut: result.StdOut, StdErr: result.StdErr})
 	return
 }
