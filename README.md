@@ -5,5 +5,5 @@ More details about supported endpoint(s) are here: https://www.getpostman.com/co
 
 Supports:
 
-* Optionally specifying shell to use when running commands
+* Optionally specifying the name of the shell to use when running commands
 * Running commands as root (sudo)
