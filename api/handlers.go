@@ -39,7 +39,13 @@ func (l *HTTPListener) cmdHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := shell.ExecuteCmd(r.Context(), cmdRequest.ShellName, cmdRequest.Password, cmdRequest.Command, lg)
+	commandsList, err := shell.ValidateCmd(cmdRequest.Command, lg)
+	if err != nil {
+		lg.WithFields(log.Fields{"err": err.Error()}).Info(errRequestValidationFailed)
+		writeResponse(w, http.StatusBadRequest, false, errRequestValidationFailed, []string{err.Error()}, nil)
+		return
+	}
+	result := shell.ExecuteCmd(r.Context(), cmdRequest.ShellName, cmdRequest.Password, commandsList, lg)
 	if result.Error != nil {
 		writeResponse(w, result.StatusCode, false, result.Message, []string{result.Error.Error()}, cmdResponse{StdOut: result.StdOut, StdErr: result.StdErr})
 		return

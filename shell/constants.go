@@ -1,10 +1,11 @@
 package shell
 
-import "net/http"
-
 const (
 	errCommandNotFound = "could not identify command"
 	errCommandTimedOut = "timed out when trying to execute command"
+	errExitCodeNotZero = "got a non-zero exit code after executing command"
 )
 
-var errInternal = http.StatusText(http.StatusInternalServerError)
+const (
+	sudoCommand = "sudo"
+)

@@ -25,7 +25,22 @@ type output struct {
 	StatusCode int
 }
 
-func ExecuteCmd(ctx context.Context, shellName, password string, command string, lg *log.Entry) *output {
+func ValidateCmd(command string, lg *log.Entry) ([]string, error) {
+
+	commandsList := getCleanedUpCommandsList(command)
+
+	if len(commandsList) == 0 {
+		return nil, ErrNoCommand
+	}
+
+	if err := isSudoCommandValid(commandsList); err != nil {
+		return nil, err
+	}
+	return commandsList, nil
+
+}
+
+func ExecuteCmd(ctx context.Context, shellName, password string, commandsList []string, lg *log.Entry) *output {
 	var (
 		stdout bytes.Buffer
 		stderr bytes.Buffer
@@ -33,7 +48,7 @@ func ExecuteCmd(ctx context.Context, shellName, password string, command string,
 	ctx, cancel := context.WithTimeout(ctx, shellTimeout)
 	defer cancel()
 
-	cmd := buildFullCommand(shellName, command)
+	cmd := buildFullCommand(shellName, commandsList)
 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -46,21 +61,19 @@ func ExecuteCmd(ctx context.Context, shellName, password string, command string,
 		if p == nil {
 			return
 		}
-		killProcess(p, command, password, lg)
+		killProcess(p, commandsList[0], password, lg)
 	}()
 	err := cmd.Run()
 	if err != nil {
 		message, statusCode := getMessageAndStatusCodeForError(err)
 		result := &output{Error: err, StdOut: stdout.String(), StdErr: stderr.String(), Message: message, StatusCode: statusCode}
-		lg.WithFields(log.Fields{"err": err.Error(), "status": result.StatusCode}).Error("could not execute shell command")
+		lg.WithFields(log.Fields{"err": err.Error(), "status": result.StatusCode}).Error(message)
 		return result
 	}
 	return &output{Error: nil, StdOut: stdout.String(), StdErr: stderr.String(), Message: "command executed successfully", StatusCode: http.StatusOK}
 }
 
-func buildFullCommand(shellName string, command string) *exec.Cmd {
-
-	commandsList := getCleanupCommandsList(command)
+func buildFullCommand(shellName string, commandsList []string) *exec.Cmd {
 
 	if len(shellName) > 0 {
 		commandsListWithShell := []string{}
@@ -76,7 +89,22 @@ func buildFullCommand(shellName string, command string) *exec.Cmd {
 
 }
 
-func getCleanupCommandsList(command string) []string {
+func isSudoCommandValid(commandsList []string) error {
+
+	if commandsList[0] != sudoCommand {
+		return nil
+	}
+	if len(commandsList) < 3 {
+		return ErrInvalidSudoCommand
+	}
+	if commandsList[1] != "-S" {
+		return ErrInvalidSudoCommand
+	}
+	return nil
+
+}
+
+func getCleanedUpCommandsList(command string) []string {
 
 	commandsList := strings.Split(command, " ")
 
@@ -90,43 +118,23 @@ func getCleanupCommandsList(command string) []string {
 	return cleanedUpCommands
 }
 
-func getMessageAndStatusCodeForError(err error) (string, int) {
-
-	if isNotFoundErr(err) {
-
-		return errCommandNotFound, http.StatusNotFound
-	}
-	if isTimeOutErr(err) {
-		return errCommandTimedOut, http.StatusRequestTimeout
-	}
-	return errInternal, http.StatusInternalServerError
-
-}
-
-func killProcess(p *os.Process, command, password string, lg *log.Entry) {
+func killProcess(p *os.Process, firstCommand, password string, lg *log.Entry) {
 	errProcessKillFailed := errors.New("could not kill process after trying to execute shell command till timeout")
 
-	if !strings.Contains(command, "sudo") {
-		if err := syscall.Kill(-p.Pid, syscall.SIGKILL); err != nil {
-			lg.WithFields(log.Fields{"err": err.Error()}).Error(errProcessKillFailed.Error())
-			return
-		}
+	if _, err := os.FindProcess(int(-p.Pid)); err != nil {
+		return
 	}
 
-	if _, err := exec.Command("bash", "-c", fmt.Sprintf("echo %s | sudo -S kill -%d -%d", password, syscall.SIGKILL, p.Pid)).Output(); err != nil {
+	if firstCommand != sudoCommand {
+		if err := syscall.Kill(-p.Pid, syscall.SIGKILL); err != nil && !isNoSuchProcessErr(err) {
+			lg.WithFields(log.Fields{"err": err.Error()}).Error(errProcessKillFailed.Error())
+		}
+		return
+	}
+	if _, err := exec.Command("bash", "-c", fmt.Sprintf("echo %s | sudo -S kill -%d -%d", password, syscall.SIGKILL, p.Pid)).Output(); err != nil && !isNoSuchProcessErr(err) {
 
 		lg.WithFields(log.Fields{"err": err.Error()}).Error(errProcessKillFailed.Error())
 
 	}
-
-}
-
-func isNotFoundErr(err error) bool {
-
-	return err != nil && strings.Contains(err.Error(), "file not found")
-}
-
-func isTimeOutErr(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "killed")
 
 }
