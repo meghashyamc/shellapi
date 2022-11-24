@@ -17,7 +17,7 @@ type HTTPListener struct {
 	validate *validator.Validate
 }
 
-func NewHTTPListener() (*HTTPListener, error) {
+func NewHTTPListener() *HTTPListener {
 
 	listener := &HTTPListener{validate: newValidator()}
 	server := &http.Server{
@@ -27,7 +27,7 @@ func NewHTTPListener() (*HTTPListener, error) {
 		ReadTimeout:  serverReadTimeout,
 	}
 	listener.server = server
-	return listener, nil
+	return listener
 
 }
 
