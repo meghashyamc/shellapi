@@ -9,6 +9,7 @@ import (
 var (
 	ErrNoCommand          = errors.New("no command was sent")
 	ErrInvalidSudoCommand = errors.New("command with sudo not sent in the expected format")
+	errProcessKillFailed  = errors.New("could not kill process after trying to execute shell command till timeout")
 )
 
 func getMessageAndStatusCodeForError(err error) (string, int) {

@@ -1,8 +1,13 @@
 package api
 
+import "time"
+
 const (
 	// general
-	servicePort = 8000
+	servicePort        = 8000
+	shutdownTime       = 5 * time.Second
+	serverWriteTimeout = 60 * time.Second
+	serverReadTimeout  = 60 * time.Second
 
 	// middleware
 	traceKey     = "trace-id"
