@@ -12,7 +12,7 @@ import (
 )
 
 func (l *HTTPListener) homeHandler(w http.ResponseWriter, r *http.Request) {
-	lg := logger(mux.CurrentRoute(r).GetName(), r.Context())
+	lg := routeLogger(mux.CurrentRoute(r).GetName(), r.Context())
 	lg.Info()
 
 	writeResponse(w, http.StatusOK, true, "Successfully reached API home", nil, nil)
@@ -22,7 +22,7 @@ func (l *HTTPListener) homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func (l *HTTPListener) cmdHandler(w http.ResponseWriter, r *http.Request) {
 
-	lg := logger(mux.CurrentRoute(r).GetName(), r.Context())
+	lg := routeLogger(mux.CurrentRoute(r).GetName(), r.Context())
 	lg.Info()
 	cmdRequest := models.CmdRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&cmdRequest); err != nil {
@@ -30,7 +30,6 @@ func (l *HTTPListener) cmdHandler(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, http.StatusBadRequest, false, "", []string{errCouldNotUnmarshal}, nil)
 		return
 	}
-
 	defer r.Body.Close()
 
 	if err := l.validate.Struct(cmdRequest); err != nil {

@@ -3,7 +3,6 @@ package shell
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -119,22 +118,20 @@ func getCleanedUpCommandsList(command string) []string {
 }
 
 func killProcess(p *os.Process, firstCommand, password string, lg *log.Entry) {
-	errProcessKillFailed := errors.New("could not kill process after trying to execute shell command till timeout")
 
-	if _, err := os.FindProcess(int(-p.Pid)); err != nil {
-		return
-	}
-
-	if firstCommand != sudoCommand {
-		if err := syscall.Kill(-p.Pid, syscall.SIGKILL); err != nil && !isNoSuchProcessErr(err) {
-			lg.WithFields(log.Fields{"err": err.Error()}).Error(errProcessKillFailed.Error())
+	if firstCommand == sudoCommand {
+		if _, err := exec.Command("bash", "-c", fmt.Sprintf("echo %s | sudo -S kill -%d -%d", password, syscall.SIGKILL, p.Pid)).Output(); err != nil && !isNoSuchProcessErr(err) {
+			lg.WithFields(log.Fields{"err": err.Error()}).Info(errProcessKillFailed.Error())
+			killProcessWithoutSudo(p, lg)
 		}
 		return
 	}
-	if _, err := exec.Command("bash", "-c", fmt.Sprintf("echo %s | sudo -S kill -%d -%d", password, syscall.SIGKILL, p.Pid)).Output(); err != nil && !isNoSuchProcessErr(err) {
+	killProcessWithoutSudo(p, lg)
 
+}
+
+func killProcessWithoutSudo(p *os.Process, lg *log.Entry) {
+	if err := syscall.Kill(-p.Pid, syscall.SIGKILL); err != nil && !isNoSuchProcessErr(err) {
 		lg.WithFields(log.Fields{"err": err.Error()}).Error(errProcessKillFailed.Error())
-
 	}
-
 }

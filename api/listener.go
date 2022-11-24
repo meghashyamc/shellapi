@@ -6,20 +6,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
-	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
-)
-
-const (
-	shutdownTime       = 5 * time.Second
-	serverWriteTimeout = 60 * time.Second
-	serverReadTimeout  = 60 * time.Second
 )
 
 type HTTPListener struct {
@@ -31,10 +21,10 @@ func NewHTTPListener() (*HTTPListener, error) {
 
 	listener := &HTTPListener{validate: newValidator()}
 	server := &http.Server{
-		Handler:      addCORSOptions(listener.newRouter()),
+		Handler:      addRecoveryOptions(addCORSOptions(listener.newRouter())),
 		Addr:         fmt.Sprintf(":%d", servicePort),
-		WriteTimeout: 60 * time.Second,
-		ReadTimeout:  60 * time.Second,
+		WriteTimeout: serverWriteTimeout,
+		ReadTimeout:  serverReadTimeout,
 	}
 	listener.server = server
 	return listener, nil
@@ -42,7 +32,7 @@ func NewHTTPListener() (*HTTPListener, error) {
 }
 
 func (l *HTTPListener) Listen() {
-	lg := logger("none", context.Background())
+	lg := defaultLogger()
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -66,12 +56,4 @@ func (l *HTTPListener) Listen() {
 	}
 	lg.Info("server exited gracefully")
 
-}
-
-func addCORSOptions(r *mux.Router) http.Handler {
-
-	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "X-Forwarded-Authorization", "Content-Type", "Access-Control-Allow-Origin", "Authorization", "X-API-Key", "Accept", "Accept-Encoding", "X-Request-Id", "Content-Length", "User-Agent"})
-	originsOk := handlers.AllowedOrigins(strings.Split(os.Getenv("ORIGIN_ALLOWED"), ","))
-	methodsOk := handlers.AllowedMethods([]string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodOptions, http.MethodDelete, http.MethodPut, http.MethodPatch})
-	return handlers.CORS(originsOk, headersOk, methodsOk)(r)
 }
