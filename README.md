@@ -1,7 +1,7 @@
 A REST API to run shell commands.
 
 
-More details about supported endpoint(s) are here: https://www.getpostman.com/collections/b2e4ee16a859c4d0e0a7
+More details about supported endpoint(s) are here: https://documenter.getpostman.com/view/24043719/2s8YsozEmb
 
 Supports:
 
